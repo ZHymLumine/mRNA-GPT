@@ -1,0 +1,15 @@
+.DS_Store
+tokenizer*/
+__pycache__/
+data/
+wandb/
+gpt2_mrna_model*/
+temp_utils/
+rna_sequences*
+sub_rna_seqs.txt
+*.fasta
+tokenizer_codon/
+
+output/
+test_tokenizer.py
+codon_esm.py

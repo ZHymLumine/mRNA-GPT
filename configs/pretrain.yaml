@@ -1,0 +1,51 @@
+# -----------------------------------------------------------------------------
+# I/O
+data_dir: "/home/yzhang/research/mRNAdesigner_3/data/" # learning data directory
+out_dir: "/home/yzhang/research/mRNAdesigner_3/output/" # output directory
+log_dir: "/home/yzhang/research/mRNAdesigner_3/output/logs" # logs will be written into this directory
+ckpt_path: ""
+
+# -----------------------------------------------------------------------------
+# model parameters
+meta_vocab_size: 69 # vocabulary size
+block_size: 512 # maximum sequence length
+n_layer: 24 # number of Transformer layers
+n_head: 16 # number of attention heads
+n_embd: 1024 # embedding size
+bias: false # use bias in LayerNorm and Linear layers
+
+# -----------------------------------------------------------------------------
+# learning parameters
+max_iters: 1000000 # total number of training iterations
+eval_interval: 1000 # evaluation interval
+log_interval: 1 # logging interval
+eval_iters: 100 # evaluation steps
+eval_only: false # exit after first evaluation if true
+always_save_checkpoint: true # always save a checkpoint after evaluation
+init_from: "scratch" # initialization method: 'scratch', 'resume', or 'gpt2*'
+
+# training configuration
+gradient_accumulation_steps: 16 # steps for gradient accumulation
+batch_size: 16 # batch size
+
+# adamw optimizer settings
+learning_rate: 0.001 # max learning rate
+dropout: 0.0 # dropout rate
+weight_decay: 0 # weight decay coefficient
+beta1: 0.9 # AdamW beta1
+beta2: 0.999 # AdamW beta2
+grad_clip: 1.0 # gradient clipping value
+
+# learning rate decay settings
+decay_lr: true # whether to decay learning rate
+warmup_iters: 5000 # number of warmup iterations
+lr_decay_iters: 1000000 # learning rate decay iterations
+min_lr: 0.0001 # minimum learning rate
+
+# DDP settings
+backend: "nccl" # distributed backend
+
+# system settings
+device: "cuda" # computation device
+dtype: "float32" # data type ('float32', 'bfloat16', or 'float16')
+compile: true # use PyTorch 2.0 to compile the model
