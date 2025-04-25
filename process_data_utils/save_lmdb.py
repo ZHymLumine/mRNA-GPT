@@ -209,7 +209,7 @@ def main():
     print("Paths setup complete...")
 
     # Tokenization
-    VOCAB_FILE = "/Users/zym/Downloads/Research/Okumura_lab/mRNAdesigner_3/tokenizer/vocab.txt"
+    VOCAB_FILE = os.path.join(args.tokenizer_path, "vocab.txt")
     tokenizer = BertTokenizerFast(vocab_file=VOCAB_FILE, do_lower_case=False)
     tokenize_and_save_lines(tokenizer, raw_data_path, train_txt_path, val_txt_path, train_lmdb_path, val_lmdb_path, args.is_start_with_eos, args.is_end_with_eos, args.block_size, args.split_ratio, args.chunk_size)
 
