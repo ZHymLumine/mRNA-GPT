@@ -93,51 +93,6 @@ class Block(nn.Module):
         x = x + self.mlp(self.ln_2(x))
         return x
 
-class TaxonomyRoPE(nn.Module):
-    def __init__(self, taxonomy_levels, taxonomy_dim):
-        super().__init__()
-        self.taxonomy_levels = taxonomy_levels
-        self.taxonomy_dim = taxonomy_dim
-        theta = 10000.0 ** (-2 * (torch.arange(taxonomy_dim // 2) / taxonomy_dim))
-        self.theta = theta.to(dtype=torch.float)
-
-        theta_weights = 10000.0 ** (-2 * (torch.arange(taxonomy_levels, dtype=torch.float) / taxonomy_dim))
-        self.weights = nn.Parameter(theta_weights / theta_weights.sum(), requires_grad=False)  # 归一化权重
-
-    def forward(self, taxonomy_embedding):
-        """
-        taxonomy_embedding: (N, 10, D) -> (N, D)
-        """
-        device = taxonomy_embedding.device
-        num_levels = taxonomy_embedding.shape[1]  # 8个taxonomy层级
-
-        level_idx = torch.arange(num_levels, dtype=torch.float, device=device)
-        pos_emb = torch.einsum('i,j->ij', level_idx, self.theta.to(device))  # (num_levels, D//2)
-
-        cos_pos = torch.cos(pos_emb)
-        sin_pos = torch.sin(pos_emb)
-
-        x1, x2 = taxonomy_embedding[..., ::2], taxonomy_embedding[..., 1::2]
-        taxonomy_embedding_rotated = torch.cat([
-            x1 * cos_pos - x2 * sin_pos,
-            x1 * sin_pos + x2 * cos_pos
-        ], dim=-1)  # (N, 8, D)
-
-        # (Weighted Pooling）
-        pooled_embedding = torch.sum(taxonomy_embedding_rotated * self.weights.unsqueeze(-1).to(device), dim=1)  # (N, D)
-
-        return pooled_embedding
-
-class FiLM(nn.Module):
-    def __init__(self, d):
-        super().__init__()
-        self.film_layer = nn.Linear(d, 2 * d)
-
-    def forward(self, taxonomy_embedding):
-        gamma_beta = self.film_layer(taxonomy_embedding)
-        gamma, beta = torch.chunk(gamma_beta, chunks=2, dim=-1)
-        return gamma, beta  
-
 @dataclass
 class GPTConfig:
     block_size: int = 1024
@@ -147,8 +102,6 @@ class GPTConfig:
     n_embd: int = 768
     dropout: float = 0.0
     bias: bool = True
-    taxonomy_vocab_size: int = 44454
-    taxonomy_levels: int = 10
 
 class GPT(nn.Module):
 
@@ -167,8 +120,6 @@ class GPT(nn.Module):
             ln_f = LayerNorm(config.n_embd, bias=config.bias),
         ))
 
-        self.rope = TaxonomyRoPE(config.taxonomy_levels, config.n_embd)
-        self.film = FiLM(config.n_embd)
         self.lm_head = nn.Linear(config.n_embd, config.vocab_size, bias=False)
         self.transformer.wte.weight = self.lm_head.weight
 
