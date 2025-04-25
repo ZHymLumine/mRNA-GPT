@@ -1,5 +1,4 @@
 .DS_Store
-tokenizer*/
 __pycache__/
 data/
 wandb/
@@ -8,7 +7,6 @@ temp_utils/
 rna_sequences*
 sub_rna_seqs.txt
 *.fasta
-tokenizer_codon/
 
 output/
 test_tokenizer.py

@@ -157,7 +157,7 @@ def tokenize_and_save_lines(tokenizer, input_file, train_txt_file, val_txt_file,
                 for train_line in train_lines_list:
                     text = process_line(train_line)
                     if text != '':
-                        ids = tokenizer.encode(text, add_special_tokens=False)
+                        ids = tokenizer.encode(text)
                         if len(ids) <= block_size:
                             train_ids.append(ids)
                             train_lines.append(text)
@@ -165,7 +165,7 @@ def tokenize_and_save_lines(tokenizer, input_file, train_txt_file, val_txt_file,
                 for val_line in val_lines_list:
                     text = process_line(val_line)
                     if text != '':
-                        ids = tokenizer.encode(text, add_special_tokens=False)
+                        ids = tokenizer.encode(text)
                         if len(ids) <= block_size:
                             val_ids.append(ids)
                             val_lines.append(text)
@@ -209,7 +209,7 @@ def main():
     print("Paths setup complete...")
 
     # Tokenization
-    VOCAB_FILE = args.tokenizer_path + "/vocab.txt"
+    VOCAB_FILE = "/Users/zym/Downloads/Research/Okumura_lab/mRNAdesigner_3/tokenizer/vocab.txt"
     tokenizer = BertTokenizerFast(vocab_file=VOCAB_FILE, do_lower_case=False)
     tokenize_and_save_lines(tokenizer, raw_data_path, train_txt_path, val_txt_path, train_lmdb_path, val_lmdb_path, args.is_start_with_eos, args.is_end_with_eos, args.block_size, args.split_ratio, args.chunk_size)
 
@@ -223,4 +223,4 @@ if __name__ == "__main__":
 
     
 
-# python save_lmdb.py --file_path /home/yzhang/research/mRNAdesigner_3/data/rna_seq.txt --tokenizer_path "/home/yzhang/research/mRNAdesigner_3/tokenizer" --out_dir /home/yzhang/research/mRNAdesigner_3/data/ --block_size 512
+# python save_lmdb.py --file_path /Users/zym/Downloads/Research/Okumura_lab/mRNAdesigner_3/data/rna_seq.txt --tokenizer_path "/Users/zym/Downloads/Research/Okumura_lab/mRNAdesigner_3/tokenizer" --out_dir /Users/zym/Downloads/Research/Okumura_lab/mRNAdesigner_3/data/ --block_size 512
