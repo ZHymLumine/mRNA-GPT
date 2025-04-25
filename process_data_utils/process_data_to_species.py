@@ -2,18 +2,16 @@ import os
 import csv
 import re
 
-input_dir = "/Users/zym/Downloads/Research/Okumura_lab/protein2rna/ncbi_dataset/data"
-output_file = "/Users/zym/Downloads/Research/Okumura_lab/mRNAdesigner_3/data/rna_seq.txt"
+input_dir = "/home/yzhang/research/mRNAdesigner_3/data"
+output_file = "/home/yzhang/research/mRNAdesigner_3/data/rna_seq_test.txt"
 
 with open(output_file, "w") as out_f:
     for root, dirs, files in os.walk(input_dir):
-        for dir_name in dirs:
-            if dir_name.startswith("GCF_"):
-                fna_path = os.path.join(root, dir_name, "cds_from_genomic.fna")
+        for file in files:
+            if file.endswith(".fna"):
+                fna_path = os.path.join(root, file)
                 
                 if os.path.exists(fna_path):
-                    gcf_id = dir_name
-                    
                     with open(fna_path, "r") as fna_file:
                         sequence = ""
                         for line in fna_file:
