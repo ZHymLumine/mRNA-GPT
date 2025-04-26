@@ -14,7 +14,7 @@ from tqdm import tqdm
 import random
 
 from contextlib import nullcontext
-from transformers import AutoTokenizer
+from transformers import AutoTokenizer, BertTokenizerFast
 import numpy as np
 import torch
 from torch.utils.data import Dataset, DataLoader
@@ -22,7 +22,6 @@ from torch.nn.parallel import DistributedDataParallel
 from torch.distributed import init_process_group, destroy_process_group
 
 from model import GPTConfig, GPT
-from data.alphabet import Alphabet
 
 def log_and_write(filename, message):
     with open(filename, 'a') as f:
@@ -111,7 +110,7 @@ def main():
 
     VOCAB_FILE = "tokenizer/vocab.txt"
     tokenizer = BertTokenizerFast(vocab_file=VOCAB_FILE, do_lower_case=False)
-    # tokenizer = Alphabet.load("../tokenizer_codon.json")
+
     print(f'tokenizer length:{len(tokenizer)}')
     # -----------------------------------------------------------------------------
     ddp = int(os.environ.get('RANK', -1)) != -1 # is this a ddp run?

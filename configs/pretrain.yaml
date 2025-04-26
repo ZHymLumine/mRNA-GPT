@@ -8,7 +8,7 @@ ckpt_path: ""
 # -----------------------------------------------------------------------------
 # model parameters
 meta_vocab_size: 69 # vocabulary size
-block_size: 512 # maximum sequence length
+block_size: 1024 # maximum sequence length
 n_layer: 24 # number of Transformer layers
 n_head: 16 # number of attention heads
 n_embd: 1024 # embedding size
