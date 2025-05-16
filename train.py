@@ -215,7 +215,7 @@ def main():
     
     # wrap model into DDP container
     if ddp:
-        model = DistributedDataParallel(model, device_ids=[ddp_local_rank])
+        model = DistributedDataParallel(model, device_ids=[ddp_local_rank], find_unused_parameters=False)
 
     @torch.no_grad()
     def estimate_loss():

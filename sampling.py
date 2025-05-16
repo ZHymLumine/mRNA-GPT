@@ -9,7 +9,7 @@ from model import GPTConfig, GPT
 from tqdm import tqdm
 import random
 import numpy as np
-from transformers import AutoTokenizer
+from transformers import BertTokenizerFast
 from transformers.models.gpt2.tokenization_gpt2 import bytes_to_unicode
 import argparse
 import itertools
@@ -27,20 +27,11 @@ if __name__ == "__main__":
     parser.add_argument("--top_k",type=int, required=False,default=20,help="retain only the top_k most likely tokens, clamp others to have 0 probability")
     parser.add_argument("--ckpt_path",type=str, required=True,help="path to a checkpoint/model")
     parser.add_argument("--tokenizer_path",type=str, required=True,help="path to a tokenizer directory")
-    parser.add_argument("--start",type=str, required=False,default="<|endoftext|>")
+    parser.add_argument("--start",type=str, required=False,default="[SEP]")
     parser.add_argument("--repetition_penalty",type=float, required=False,default=1.0)
     parser.add_argument("--shuffle_token", action='store_true', help="Enable shuffling of tokens before decoding")
     parser.add_argument("--fasta", action='store_true', default=True, help="Enable writing output in FASTA format")
 
-    parser.add_argument("--tax_id", type=str, required=False, help="Taxonomy: Tax id")
-    parser.add_argument("--kingdom", type=str, required=True, help="Taxonomy: Kingdom")
-    parser.add_argument("--phylum", type=str, required=True, help="Taxonomy: Phylum")
-    parser.add_argument("--class_", type=str, required=True, help="Taxonomy: Class")  # 注意：避免与 Python 的关键字 `class` 冲突
-    parser.add_argument("--order", type=str, required=True, help="Taxonomy: Order")
-    parser.add_argument("--family", type=str, required=True, help="Taxonomy: Family")
-    parser.add_argument("--genus", type=str, required=True, help="Taxonomy: Genus")
-    parser.add_argument("--species", type=str, required=True, help="Taxonomy: Species")
-    parser.add_argument("--strain", type=str, required=False, help="Taxonomy: Strain")
     args = parser.parse_args()
     init_from = args.init_from
     out_path = args.out_path
@@ -56,14 +47,7 @@ if __name__ == "__main__":
     repetition_penalty = args.repetition_penalty
     fasta = args.fasta
 
-    taxonomy_text = "".join([
-        f"<{value}>" for value in [
-            args.tax_id, args.kingdom, args.phylum, args.class_, args.order, args.family, args.genus, args.species, args.strain
-        ] if value is not None
-    ])
-
-    input_text = f"{taxonomy_text}<|endoftext|>" 
-    start = input_text
+    
     # -----------------------------------------------------------------------------
     seed = random.randint(1,6666)
     device = 'cuda' 
@@ -73,7 +57,8 @@ if __name__ == "__main__":
 
     # -----------------------------------------------------------------------------
     # Load tokenizer & ckpt_path
-    tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
+    VOCAB_FILE = os.path.join(args.tokenizer_path, "vocab.txt")
+    tokenizer = BertTokenizerFast(vocab_file=VOCAB_FILE, do_lower_case=False)
     # -----------------------------------------------------------------------------
 
     torch.manual_seed(seed)
@@ -112,8 +97,10 @@ if __name__ == "__main__":
 
     fasta_out_path = os.path.splitext(out_path)[0] + ".fasta" if fasta else None
 
+    input_text = f"[SEP]" 
+    start = input_text
     if strategy in["sampling", "top_k"]:
-        start_ids = encode("".join(start))
+        start_ids = encode("".join(start), add_special_tokens=False)
         print(f'start:{start} \n start_ids: {start_ids}')
         x = (torch.tensor(start_ids, dtype=torch.long, device=device)[None, ...])
 
@@ -146,25 +133,25 @@ if __name__ == "__main__":
             with open(fasta_out_path, 'a') if fasta else nullcontext() as fasta_f:
                 with torch.no_grad():
                     with ctx:
-                        start = '<|endoftext|>'
-                        start_ids = encode(start)
+                        start = '[SEP]'
+                        start_ids = encode(start, add_special_tokens=False)
                         x = (torch.tensor(start_ids, dtype=torch.long, device=device)[None, ...])
 
-                        token_sequence = model.generate(x, max_new_tokens, strategy=strategy, temperature=temperature, top_k=top_k, repetition_penalty=repetition_penalty, beam_size=beam_size)[0].tolist()
+                        for k in tqdm(range(num_samples), desc="Generating samples"):
+                            token_sequence = model.generate(x, max_new_tokens, strategy=strategy, temperature=temperature, top_k=top_k, repetition_penalty=repetition_penalty, beam_size=beam_size)[0].tolist()
 
-                        y = decode(token_sequence).replace(' ', '')
-                        f.write(y)
-                        f.flush()
+                            y = decode(token_sequence).replace(' ', '')
+                            f.write(y)
+                            f.flush()
+
+                            print(f"k: {k}")
+                            print(f"y: {y}")
+
+                            if fasta:
+                                fasta_entry = f">sample_{k}\n{y.replace(' ', '')}\n"
+                                print(f"fasta_entry: {fasta_entry}")
+                                fasta_f.write(fasta_entry.strip() + '\n')
+                                fasta_f.flush()
 
 
-                        if fasta:
-                            fasta_entry = f">sample_{k}\n{y.replace(' ', '')}\n"
-                            fasta_f.write(fasta_entry.strip() + '\n')
-                            fasta_f.flush()
-
-
-# python sampling.py \
-#     --out_path output.fasta \
-#     --max_new_tokens 256 \
-#     --ckpt_path /raid_elmo/home/lr/zym/mRNAdesigner/output/ckpt_1000.pt \
-#     --tokenizer_path ZYMScott/mRNAdesigner_BPE_1024 --tax_id "511145" --kingdom "Bacteria" --phylum "Pseudomonadota" --class_ "Gammaproteobacteria" --order "Enterobacterales" --family "Enterobacteriaceae" --genus "Escherichia" --species "Escherichia coli"
+# CUDA_VISIBLE_DEVICES=1 python sampling.py --out_path output.fasta --max_new_tokens 256 --ckpt_path /home/yzhang/research/mRNAdesigner_3/output/ckpt_563000.pt --tokenizer_path /home/yzhang/research/mRNAdesigner_3/tokenizer --fasta

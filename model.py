@@ -333,8 +333,12 @@ class GPT(nn.Module):
             completed_seqs.sort(key=lambda x: x[0].mean().item(), reverse=True)
             return completed_seqs[0][1]
 
-
         else:
+            # 用于跟踪每个序列是否已经生成了结束标记
+            if batch_size > 1:
+                # 对于批量生成，我们需要跟踪每个序列是否已经完成
+                finished = torch.zeros(batch_size, dtype=torch.bool, device=idx.device)
+            
             for _ in range(max_new_tokens):
                 idx_cond = idx if idx.size(1) <= self.config.block_size else idx[:, -self.config.block_size:]
                 logits, _ = self(idx_cond)
@@ -359,9 +363,22 @@ class GPT(nn.Module):
                         idx_next = torch.multinomial(probs, num_samples=1)
                         idx_next = torch.gather(indices, dim=-1, index=idx_next)
 
-                if idx_next == eos_token_id:
-                    break
+                # 处理批量生成时的结束标记
+                if batch_size > 1:
+                    # 检查每个序列是否生成了结束标记
+                    for i in range(batch_size):
+                        if idx_next[i, 0] == eos_token_id:
+                            finished[i] = True
+                    
+                    # 如果所有序列都完成了，就结束生成
+                    if finished.all():
+                        break
+                else:
+                    # 单个序列的情况
+                    if idx_next[0, 0] == eos_token_id:
+                        break
+
                 idx = torch.cat((idx, idx_next), dim=1)
 
-        return idx if idx[0][0] != eos_token_id else idx[:, 1:]
+        return idx
 

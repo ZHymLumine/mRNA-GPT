@@ -7,4 +7,6 @@ pip install deepspeed[torch]==0.16.0
 pip install wandb==0.18.7
 pip install huggingface_hub==0.26.3
 pip install lmdb==1.5.1
+pip install scikit-learn==1.6.1
+pip install matplotlib
 # pip install -U flash-attn --no-build-isolation

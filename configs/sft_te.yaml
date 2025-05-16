@@ -1,0 +1,52 @@
+# -----------------------------------------------------------------------------
+# I/O
+data_path: "/home/yzhang/research/mRNAdesigner_3/predictive_model/mRNA2te/ecoli_TE_CDS_final.csv" # SFT数据路径
+out_dir: "/home/yzhang/research/mRNAdesigner_3/output/sft_te_no_lm/" # 输出目录
+log_dir: "/home/yzhang/research/mRNAdesigner_3/output/sft/te_logs" # 日志目录
+ckpt_path: "/home/yzhang/research/mRNAdesigner_3/output/ckpt_563000.pt" # 用于恢复训练的检查点路径
+
+# -----------------------------------------------------------------------------
+# 模型参数
+meta_vocab_size: 69 # 词汇表大小
+block_size: 1024 # 最大序列长度
+n_layer: 24 # Transformer层数
+n_head: 16 # 注意力头数
+n_embd: 1024 # 嵌入维度
+bias: false # 在LayerNorm和Linear层中使用偏置
+
+# -----------------------------------------------------------------------------
+# 学习参数
+epochs: 200
+max_iters: 100000 # 总训练迭代次数
+eval_interval: 500 # 评估间隔
+log_interval: 10 # 日志记录间隔
+eval_iters: 50 # 评估步数
+eval_only: false # 如果为true，则在第一次评估后退出
+always_save_checkpoint: true # 评估后始终保存检查点
+init_from: "resume" # 初始化方法: 'scratch', 'resume', 或 'pretrained:路径'
+
+# 训练配置
+gradient_accumulation_steps: 8 # 梯度累积步数
+batch_size: 32 # 批量大小
+
+# adamw优化器设置
+learning_rate: 0.0001 # 最大学习率（微调时应该比预训练小）
+dropout: 0.1 # dropout率
+weight_decay: 0.01 # 权重衰减系数
+beta1: 0.9 # AdamW beta1
+beta2: 0.999 # AdamW beta2
+grad_clip: 1.0 # 梯度裁剪值
+
+# 学习率衰减设置
+decay_lr: true # 是否衰减学习率
+warmup_iters: 1000 # 预热迭代次数
+lr_decay_iters: 100000 # 学习率衰减迭代次数
+min_lr: 0.00001 # 最小学习率
+
+# DDP设置
+backend: "nccl" # 分布式后端
+
+# 系统设置
+device: "cuda" # 计算设备
+dtype: "float32" # 数据类型 ('float32', 'bfloat16', 或 'float16')
+compile: true # 使用PyTorch 2.0编译模型 

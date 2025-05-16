@@ -11,3 +11,6 @@ sub_rna_seqs.txt
 output/
 test_tokenizer.py
 codon_esm.py
+
+*results*/
+loss_plots/
