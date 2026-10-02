@@ -10,6 +10,7 @@ construction**, not with high probability.
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import os
 import sys
 
@@ -311,13 +312,96 @@ def validate_batch(records, label: str = "generated") -> tuple[list[dict], str]:
     return rows, "\n".join(md)
 
 
+def read_proteins(path: str) -> tuple[list[str], list[str]]:
+    """Read target proteins from FASTA, or from one sequence per line.
+
+    FASTA is what sequences usually arrive as, so it is detected rather than
+    requiring the caller to strip headers first; a file whose first
+    non-blank character is ``>`` is parsed as FASTA, anything else as one
+    sequence per line. Returns the sequences and a name for each, the latter
+    used to label the generated records.
+    """
+    with open(path) as fh:
+        lines = [l.strip() for l in fh if l.strip()]
+    if not lines:
+        raise ValueError(f"{path} contains no sequences")
+
+    if lines[0].startswith(">"):
+        names, seqs, cur = [], [], []
+        for line in lines:
+            if line.startswith(">"):
+                if cur:
+                    seqs.append("".join(cur))
+                    cur = []
+                names.append(line[1:].split()[0] or f"seq{len(names) + 1}")
+            else:
+                cur.append(line.upper())
+        if cur:
+            seqs.append("".join(cur))
+        if len(seqs) != len(names):
+            raise ValueError(f"{path}: a FASTA header has no sequence under it")
+    else:
+        seqs = [l.upper() for l in lines]
+        names = [f"seq{i + 1}" for i in range(len(seqs))]
+
+    unknown = {c for s in seqs for c in s} - set(SYMBOLS)
+    if unknown:
+        raise ValueError(f"{path}: unknown residue symbol(s) "
+                         f"{''.join(sorted(unknown))}; expected amino acids, "
+                         f"not nucleotides")
+    return seqs, names
+
+
+def _load_safetensors(directory: str, device: str) -> tuple[dict, dict]:
+    """Published layout: ``config.json`` beside ``model.safetensors``.
+
+    The export drops the tied ``lm_head.weight``, because safetensors refuses to
+    serialise two names backed by the same storage. Tying is recorded in
+    config.json and re-established when the model is constructed, so the key is
+    restored by construction rather than by the state dict.
+    """
+    import json
+    from safetensors.torch import load_file
+
+    with open(os.path.join(directory, "config.json")) as fh:
+        raw = json.load(fh)
+    known = {f.name for f in dataclasses.fields(GPTConfig)}
+    args = {k: v for k, v in raw.items() if k in known}
+    return args, load_file(os.path.join(directory, "model.safetensors"),
+                           device=device)
+
+
 def load_model(ckpt_path: str, device: str = "cuda") -> GPT:
-    state = torch.load(ckpt_path, map_location=device, weights_only=False)
-    cfg = GPTConfig(**state["model_args"])
-    model = GPT(cfg).to(device)
-    sd = {(k[10:] if k.startswith("_orig_mod.") else k): v
-          for k, v in state["model"].items()}
-    model.load_state_dict(sd)
+    """Load from a published model directory or a training checkpoint.
+
+    ``ckpt_path`` may be a directory holding ``config.json`` and
+    ``model.safetensors`` (what ``huggingface-cli download`` produces), the
+    ``model.safetensors`` file inside such a directory, or a ``.pt`` checkpoint
+    written during training.
+    """
+    directory = None
+    if os.path.isdir(ckpt_path):
+        directory = ckpt_path
+    elif ckpt_path.endswith(".safetensors"):
+        directory = os.path.dirname(os.path.abspath(ckpt_path))
+
+    if directory is not None:
+        model_args, sd = _load_safetensors(directory, device)
+    else:
+        state = torch.load(ckpt_path, map_location=device, weights_only=False)
+        model_args = state["model_args"]
+        sd = {(k[10:] if k.startswith("_orig_mod.") else k): v
+              for k, v in state["model"].items()}
+
+    model = GPT(GPTConfig(**model_args)).to(device)
+    missing, unexpected = model.load_state_dict(sd, strict=False)
+    if unexpected:
+        raise RuntimeError(f"unexpected keys in {ckpt_path}: {unexpected[:5]}")
+    # lm_head.weight is tied to transformer.wte.weight, so it is populated by
+    # loading the latter; anything else missing means the wrong file.
+    unresolved = [k for k in missing if k != "lm_head.weight"]
+    if unresolved:
+        raise RuntimeError(f"missing keys in {ckpt_path}: {unresolved[:5]}")
     model.eval()
     return model
 
@@ -341,18 +425,20 @@ def main():
 
     model = load_model(args.ckpt, args.device)
     if args.proteins:
-        prots = [l.strip().upper() for l in open(args.proteins) if l.strip()]
+        prots, names = read_proteins(args.proteins)
         outs = constrained_sample(model, prots, temperature=args.temperature,
                                   top_k=args.top_k, top_p=args.top_p,
                                   device=args.device, batch_size=args.batch_size)
         records = list(zip(outs, prots))
         label = "constrained"
+        out_names = names
     else:
         outs = sample(model, n=args.n, temperature=args.temperature,
                       top_k=args.top_k, top_p=args.top_p, device=args.device,
                       batch_size=args.batch_size, max_codons=args.max_codons)
         records = [(o, None) for o in outs]
         label = "unconstrained"
+        out_names = None
 
     rows, md = validate_batch(records, label)
     print(md)
@@ -361,7 +447,10 @@ def main():
     if args.out:
         with open(args.out, "w") as fh:
             for i, (codons, _) in enumerate(records):
-                fh.write(f">{label}_{i} n_codon={len(codons)}\n{''.join(codons)}\n")
+                # a constrained run carries the target's name through, so the
+                # design can be matched back to the protein it was made for
+                name = out_names[i] if out_names else f"{label}_{i}"
+                fh.write(f">{name} n_codon={len(codons)}\n{''.join(codons)}\n")
         print(f"\nwrote {len(records)} sequences -> {args.out}")
 
 

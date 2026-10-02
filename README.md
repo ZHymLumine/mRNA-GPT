@@ -72,27 +72,93 @@ Unset tool paths fall back to `$MRNA_GPT_EXTERNAL/<name>`. `$MRNA_GPT_DATA`,
 `$MRNA_GPT_RUNS` and `$MRNA_GPT_EXTERNAL` default to `data/`, `runs/` and
 `external/` under the repository root.
 
-## Quickstart
+## Pretrained models
 
-Unconstrained generation:
+| model | description |
+|---|---|
+| [`mRNA-GPT-bacteria`](https://huggingface.co/ZYMScott/mRNA-GPT-bacteria) | pretrained on bacterial coding sequences |
+| [`mRNA-GPT-archaea`](https://huggingface.co/ZYMScott/mRNA-GPT-archaea) | pretrained on archaeal coding sequences |
+| [`mRNA-GPT-eukaryote`](https://huggingface.co/ZYMScott/mRNA-GPT-eukaryote) | pretrained on eukaryotic coding sequences |
+| [`mRNA-GPT-bacterial-expression`](https://huggingface.co/ZYMScott/mRNA-GPT-bacterial-expression) | fine-tuned for high bacterial protein expression |
+| [`mRNA-GPT-fungal-expression`](https://huggingface.co/ZYMScott/mRNA-GPT-fungal-expression) | fine-tuned for high fungal expression |
+| [`mRNA-GPT-stability`](https://huggingface.co/ZYMScott/mRNA-GPT-stability) | fine-tuned for high mRNA stability |
 
 ```bash
-python -m mrnagpt.generate --ckpt path/to/model_best.pt --n 16 --out out.fasta
+pip install huggingface_hub safetensors
+huggingface-cli download ZYMScott/mRNA-GPT-bacterial-expression \
+    --local-dir mRNA-GPT-bacterial-expression
 ```
 
-Design a coding sequence for a given protein:
+## Quickstart
+
+### Design a coding sequence for your protein
+
+The main use. Put your target in a FASTA file — `--proteins` also accepts one
+bare amino-acid sequence per line:
+
+```
+>my_target
+MKAIFVLKGSLDRDLEHHHHHHGSMSTAVLENPGLGRKLSDFGQETSYIEDNSNQ
+```
 
 ```bash
 python -m mrnagpt.generate \
-    --ckpt path/to/model_best.pt \
-    --proteins targets.fasta \
+    --ckpt mRNA-GPT-bacterial-expression \
+    --proteins my_target.fasta \
     --temperature 0.8 --top-p 0.95 \
     --out designs.fasta --report designs.md
 ```
 
-`--proteins` takes a FASTA of amino-acid sequences. Output is checked with
-`validate_cds`: correct start codon, a single in-frame stop at the end, length
-divisible by three, and translation identical to the requested protein.
+`--ckpt` takes a downloaded model directory, the `model.safetensors` inside it,
+or a `.pt` checkpoint written during training.
+
+The output FASTA keeps your sequence names. The report states what fraction of
+designs start with ATG, end with a single in-frame stop, contain no internal
+stop, and translate to exactly the requested protein:
+
+```
+| | starts with ATG | ends with a stop codon | has an internal stop codon | all three satisfied |
+|---|---:|---:|---:|---:|
+| constrained | 100.00% | 100.00% | 0.00% | 100.00% |
+
+- target protein exact match: 100.00% (1/1)
+```
+
+Exactness here is structural, not statistical: at step *t* the logits are masked
+to the synonymous codon set of residue *t*, so no other protein can be emitted.
+
+### From Python
+
+```python
+from mrnagpt.generate import load_model, constrained_sample
+from mrnagpt.vocab import translate
+
+model = load_model("mRNA-GPT-bacterial-expression", device="cuda")   # or "cpu"
+
+target = "MKAIFVLKGSLDRDLEHHHHHHGSMSTAVLENPGLGRKLSDFGQETSYIEDNSNQ"
+designs = constrained_sample(
+    model, [target] * 8,          # eight independent designs
+    temperature=0.8, top_p=0.95, device="cuda",
+)
+
+for codons in designs:
+    assert translate(codons, stop_at_first_stop=True) == target
+    print("".join(codons))
+```
+
+Sampling several designs per target and ranking them is the usual workflow.
+`evaluate/` provides the rankers used in the paper: CAI and tAI, minimum free
+energy via ViennaRNA, novelty against the training corpus, and the expression
+predictors.
+
+### Unconstrained generation
+
+Sampling without a target protein, for characterising what a model learned
+about its domain:
+
+```bash
+python -m mrnagpt.generate --ckpt mRNA-GPT-bacteria --n 100 --out sampled.fasta
+```
 
 ## Training
 
