@@ -21,7 +21,7 @@ set -euo pipefail
 source /etc/profile.d/modules.sh
 module load cuda/12.6/12.6.1
 source ~/.bashrc
-conda activate mRNAdesigner3
+conda activate "${MRNA_GPT_ENV:-mrnagpt}"
 cd "${MRNA_GPT_ROOT}"
 python -m sft.generate_target_panel \
     --csv sft/data/length_panel_proteins.csv \

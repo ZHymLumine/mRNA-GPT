@@ -12,10 +12,10 @@ No predictor is fit or needed for this step, which is what keeps the LightGBM
 evaluator (evaluate/lightgbm_expression.py) genuinely independent of what built
 the SFT set.
 
-Output matches the LMDB format mrnagpt.data.CodonLMDBDataset already reads:
-legacy-encoded entries [CLS][SEP] codons [SEP][SEP] (uint8), so no changes are
-needed to the pretraining data-loading code -- the same 69->68 remap LUT
-applies at read time.
+Output matches the on-disk LMDB format mrnagpt.data.CodonLMDBDataset already
+reads -- entries framed as [CLS][SEP] codons [SEP][SEP] in uint8 -- so no
+changes are needed to the data-loading code; mrnagpt.vocab.remap_entry converts
+a stored entry to the model vocabulary at read time.
 """
 from __future__ import annotations
 
@@ -30,24 +30,23 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from sft.paths import legacy_root                                # noqa: E402
-
-OLD_CLS, OLD_SEP = 2, 3
-OLD_CODON0 = 5
-OLD_CODONS = None  # filled below
+from mrnagpt.vocab import (STORED_CLS, STORED_CODON0, STORED_SEP,  # noqa: E402
+                           CODONS)
 
 
-def _legacy_vocab():
-    global OLD_CODONS
-    path = legacy_root() / "tokenizer/vocab.txt"
-    toks = [l.strip() for l in open(path) if l.strip()]
-    assert len(toks) == 69
-    OLD_CODONS = toks[5:]
-    return {c: i + OLD_CODON0 for i, c in enumerate(OLD_CODONS)}
+def stored_codon_ids() -> dict[str, int]:
+    """Codon -> id under the on-disk encoding.
+
+    The stored vocabulary lists codons in the same alphabetical order as the
+    model vocabulary and simply starts them one id later, so the table is
+    derived rather than read from a file.
+    """
+    return {c: i + STORED_CODON0 for i, c in enumerate(CODONS)}
 
 
-def encode_legacy(codons: list[str], codon2id: dict) -> np.ndarray:
-    ids = [OLD_CLS, OLD_SEP] + [codon2id[c] for c in codons] + [OLD_SEP, OLD_SEP]
+def encode_stored(codons: list[str], codon2id: dict) -> np.ndarray:
+    ids = ([STORED_CLS, STORED_SEP] + [codon2id[c] for c in codons]
+           + [STORED_SEP, STORED_SEP])
     return np.array(ids, dtype=np.uint8)
 
 
@@ -165,7 +164,7 @@ def main():
     print(f"SFT split (whole-cluster, reused from the full-corpus clustering): "
           f"train={len(train_ids)} val={len(val_ids)}")
 
-    codon2id = _legacy_vocab()
+    codon2id = stored_codon_ids()
 
     def write_split(ids, label):
         txt_path = os.path.join(args.out_dir, f"{prefix}_{label}_codon.txt.gz")
@@ -182,7 +181,7 @@ def main():
         env = lmdb.open(lmdb_path, subdir=False, map_size=2 * 10**9)
         with env.begin(write=True) as txn:
             for i, codons in enumerate(entries):
-                txn.put(str(i).encode(), encode_legacy(codons, codon2id).tobytes())
+                txn.put(str(i).encode(), encode_stored(codons, codon2id).tobytes())
         env.close()
         from mrnagpt.data import build_lengths
         build_lengths(lmdb_path)

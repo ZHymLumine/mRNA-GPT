@@ -33,53 +33,38 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 EXPORT = os.path.join(HERE, "export_for_hf.py")
 
-# (repo name, checkpoint path, lineage, released, one-line description)
+# (repo name, checkpoint path, released, one-line description)
 #
-# ``released`` marks the current release set.  Entries with ``released=False``
-# are exported and card-written like any other, but only when named explicitly
+# ``released`` marks the current release set.  An entry with ``released=False``
+# is exported and card-written like any other, but only when named explicitly
 # with --only or swept in with --all, so that widening the release is a
 # deliberate act rather than a side effect of re-running this script.
 #
-# Checkpoint paths are read from the environment so this file carries no
-# machine-specific location: set MRNA_GPT_RUNS for the current-lineage runs and
-# MRNA_GPT_LEGACY_ROOT for the preprint-era ones.
+# Checkpoint paths come from MRNA_GPT_RUNS so this file carries no
+# machine-specific location.
 RUNS = os.environ.get("MRNA_GPT_RUNS", os.path.join(ROOT, "runs"))
-LEGACY = os.environ.get("MRNA_GPT_LEGACY_ROOT", "")
 
 MANIFEST = [
-    # --- current lineage: pretrained backbones -----------------------------
-    ("mRNA-GPT-bacteria", f"{RUNS}/bacteria/model_best.pt", "current", True,
+    # --- pretrained backbones ---------------------------------------------
+    ("mRNA-GPT-bacteria", f"{RUNS}/bacteria/model_best.pt", True,
      "Pretrained on bacterial coding sequences."),
-    ("mRNA-GPT-archaea", f"{RUNS}/archaea/model_best.pt", "current", True,
+    ("mRNA-GPT-archaea", f"{RUNS}/archaea/model_best.pt", True,
      "Pretrained on archaeal coding sequences."),
-    ("mRNA-GPT-eukaryote", f"{RUNS}/eukaryote/model_best.pt", "current", True,
+    ("mRNA-GPT-eukaryote", f"{RUNS}/eukaryote/model_best.pt", True,
      "Pretrained on eukaryotic coding sequences."),
-    # --- current lineage: property fine-tunes ------------------------------
-    ("mRNA-GPT-bacterial-expression", f"{RUNS}/bacexp_sft/model_best.pt",
-     "current", True,
+    # --- property fine-tunes ----------------------------------------------
+    ("mRNA-GPT-bacterial-expression", f"{RUNS}/bacexp_sft/model_best.pt", True,
      "Fine-tuned from mRNA-GPT-bacteria on the high-expression arm of a "
      "bacterial protein-expression library."),
-    ("mRNA-GPT-fungal-expression", f"{RUNS}/fungal_sft/model_best.pt",
-     "current", True,
+    ("mRNA-GPT-fungal-expression", f"{RUNS}/fungal_sft/model_best.pt", True,
      "Fine-tuned on the high-expression arm of a fungal expression dataset."),
-    ("mRNA-GPT-stability", f"{RUNS}/stability_sft/model_best.pt", "current", True,
+    ("mRNA-GPT-stability", f"{RUNS}/stability_sft/model_best.pt", True,
      "Fine-tuned on the high-stability arm of an mRNA stability dataset."),
     # --- held back from the current release --------------------------------
-    ("mRNA-GPT-translation-efficiency", f"{RUNS}/te_sft/model_best.pt",
-     "current", False,
+    ("mRNA-GPT-translation-efficiency", f"{RUNS}/te_sft/model_best.pt", False,
      "Fine-tuned on the high-translation-efficiency arm of a TE dataset."),
-    # Preprint-lineage weights, for reproducing the preprint rather than for
-    # new work.  Held back until the paper is through review.
-    ("mRNA-GPT-bacteria-preprint", f"{LEGACY}/result/ckpt_563000.pt",
-     "preprint", False,
-     "Preprint-lineage bacterial model, step 563,000."),
-    ("mRNA-GPT-archaea-preprint", f"{LEGACY}/result_archea/ckpt_62000.pt",
-     "preprint", False,
-     "Preprint-lineage archaeal model, step 62,000."),
-    ("mRNA-GPT-eukaryote-preprint", f"{LEGACY}/result_ekuaryote/ckpt_694000.pt",
-     "preprint", False,
-     "Preprint-lineage eukaryotic model, step 694,000."),
 ]
+
 
 CARD = """---
 license: apache-2.0
@@ -114,7 +99,7 @@ construction**, not with high probability.
 | Precision | bfloat16 |
 | Code | https://github.com/ZHymLumine/mRNA-GPT |
 
-{lineage_note}## Installation
+## Installation
 
 ```bash
 git clone https://github.com/ZHymLumine/mRNA-GPT && cd mRNA-GPT
@@ -225,30 +210,10 @@ serialise two names backed by the same storage. `config.json` records
 Apache-2.0.
 """
 
-PREPRINT_NOTE = """## Tokenizer compatibility
-
-These weights use the earlier 69-token vocabulary (`[CLS]`/`[SEP]`/`[MASK]`),
-learned positional embeddings and a 1024-codon context, so they cannot be loaded
-with the current 68-token tokenizer. Load them with `tools/eval_legacy_ckpt.py`,
-which reads their original `model_args`.
-
-Both vocabularies order codons alphabetically, exactly
-`itertools.product("ACGU", repeat=3)`, so `codon_id_current = codon_id_old - 1`.
-That mapping converts stored data, not weights.
-
-If you build data for these weights with `BertTokenizerFast`, pin
-`transformers==4.46.3` and `tokenizers==0.20.3`: under 5.x the same vocabulary
-file is read as 5 tokens and every codon silently becomes `[UNK]`.
-
-"""
-
-CURRENT_NOTE = ""
-
-
-def run_export(ckpt: str, out_dir: str, lineage: str) -> dict:
+def run_export(ckpt: str, out_dir: str) -> dict:
     import json
     cmd = [sys.executable, EXPORT, "--ckpt", ckpt, "--out", out_dir,
-           "--dtype", "bf16", "--lineage", lineage]
+           "--dtype", "bf16"]
     subprocess.run(cmd, check=True)
     with open(os.path.join(out_dir, "config.json")) as fh:
         return json.load(fh)
@@ -262,20 +227,19 @@ def related_models(namespace: str, exclude: str) -> str:
     """
     rows = [f"- [`{namespace}/{n}`](https://huggingface.co/{namespace}/{n}) — "
             f"{d[0].lower() + d[1:]}"
-            for n, _ck, _lin, released, d in MANIFEST
+            for n, _ck, released, d in MANIFEST
             if released and n != exclude]
     return "\n".join(rows) if rows else "_None published yet._"
 
 
 def write_card(out_dir: str, *, name: str, repo_id: str, description: str,
-               lineage: str, cfg: dict, namespace: str) -> None:
+               cfg: dict, namespace: str) -> None:
     card = CARD.format(
         name=name, repo_id=repo_id, description=description,
         n_params=cfg["n_parameters"], vocab_size=cfg["vocab_size"],
         block_size=cfg["block_size"], pos_encoding=cfg["pos_encoding"],
         n_layer=cfg["n_layer"], n_embd=cfg["n_embd"], n_head=cfg["n_head"],
         related=related_models(namespace, name),
-        lineage_note=PREPRINT_NOTE if lineage == "preprint" else CURRENT_NOTE,
     )
     with open(os.path.join(out_dir, "README.md"), "w") as fh:
         fh.write(card)
@@ -316,25 +280,25 @@ def main() -> None:
     elif args.all:
         todo = list(MANIFEST)
     else:
-        todo = [m for m in MANIFEST if m[3]]
-        held = [m[0] for m in MANIFEST if not m[3]]
+        todo = [m for m in MANIFEST if m[2]]
+        held = [m[0] for m in MANIFEST if not m[2]]
         if held:
             print(f"release set: {len(todo)} models; "
                   f"held back: {', '.join(held)}\n")
 
     published, skipped = [], []
 
-    for name, ckpt, lineage, _released, description in todo:
+    for name, ckpt, _released, description in todo:
         if not os.path.exists(ckpt):
             print(f"[skip] {name}: no checkpoint at {ckpt}")
             skipped.append(name)
             continue
         repo_id = f"{args.namespace}/{name}"
         out_dir = os.path.join(args.out_root, name)
-        print(f"\n=== {name} ({lineage}) ===")
-        cfg = run_export(ckpt, out_dir, lineage)
+        print(f"\n=== {name} ===")
+        cfg = run_export(ckpt, out_dir)
         write_card(out_dir, name=name, repo_id=repo_id,
-                   description=description, lineage=lineage, cfg=cfg,
+                   description=description, cfg=cfg,
                    namespace=args.namespace)
 
         if args.push:
@@ -344,7 +308,7 @@ def main() -> None:
                             private=not args.public, exist_ok=True)
             api.upload_folder(folder_path=out_dir, repo_id=repo_id,
                               repo_type="model",
-                              commit_message=f"Add {name} ({lineage} lineage)")
+                              commit_message=f"Add {name}")
             print(f"  pushed -> https://huggingface.co/{repo_id}")
         else:
             print(f"  staged -> {out_dir} (dry run; pass --push to upload)")

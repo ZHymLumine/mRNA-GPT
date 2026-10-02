@@ -1,13 +1,15 @@
-"""68-token codon vocabulary, the legacy-LMDB remap LUT, and the genetic code.
+"""68-token codon vocabulary, the on-disk entry remap, and the genetic code.
 
-The published model used a 69-token vocabulary carrying ``[CLS]`` and ``[MASK]``.
-Both are artifacts of bidirectional encoders (BERT's MLM / classification heads)
-and have no role in an autoregressive decoder, so they are dropped here.  The
-single ``[SEP]`` that previously served as both start and end marker is split
-into explicit ``[BOS]`` / ``[EOS]``.
+The model vocabulary is ``[PAD] [UNK] [BOS] [EOS]`` followed by the 64 codons in
+alphabetical order.
 
-The on-disk LMDBs still use the old encoding; :func:`remap_entry` converts an
-entry at read time, so no data regeneration is needed.
+Corpus LMDBs store a wider framing -- ``[CLS][SEP] c1..cn [SEP][SEP]`` over a
+69-id table whose codons start one id later -- because packing the corpus is
+expensive and the stored form carries the sequence boundaries unambiguously.
+:func:`remap_entry` converts a stored entry to the model vocabulary at read
+time, which is cheap enough to do per batch and keeps a single copy of the
+corpus on disk.  Both tables list codons in the same alphabetical order, so a
+codon's id differs by exactly one between them.
 """
 from __future__ import annotations
 
@@ -33,24 +35,25 @@ VOCAB_SIZE = len(ID2TOK)
 assert len(CODONS) == 64 and VOCAB_SIZE == 68
 
 # --------------------------------------------------------------------------- #
-# legacy vocabulary (what the LMDBs on disk contain)
+# the on-disk encoding (what corpus LMDBs contain)
 # --------------------------------------------------------------------------- #
-OLD_PAD, OLD_UNK, OLD_CLS, OLD_SEP, OLD_MASK, OLD_CODON0 = 0, 1, 2, 3, 4, 5
-OLD_VOCAB_SIZE = 69
+STORED_PAD, STORED_UNK, STORED_CLS, STORED_SEP, STORED_MASK, STORED_CODON0 = \
+    0, 1, 2, 3, 4, 5
+STORED_VOCAB_SIZE = 69
 
 
 def build_remap_lut() -> np.ndarray:
-    """256-entry uint8 LUT mapping old token ids to new ones.
+    """256-entry uint8 LUT mapping stored token ids to model ids.
 
     Intended for the slice ``raw[1:-1]``; see :func:`remap_entry`.  Anything that
     is not a codon or ``[SEP]``/``[UNK]`` maps to ``[UNK]`` so that a format
     violation surfaces as UNK rather than silently shifting the vocabulary.
     """
     lut = np.full(256, UNK_ID, dtype=np.uint8)
-    lut[OLD_UNK] = UNK_ID
-    lut[OLD_SEP] = EOS_ID
-    old = np.arange(OLD_CODON0, OLD_CODON0 + 64)
-    lut[old] = (old - 1).astype(np.uint8)
+    lut[STORED_UNK] = UNK_ID
+    lut[STORED_SEP] = EOS_ID
+    stored = np.arange(STORED_CODON0, STORED_CODON0 + 64)
+    lut[stored] = (stored - 1).astype(np.uint8)
     return lut
 
 
@@ -67,8 +70,8 @@ def remap_entry(raw: np.ndarray, check: bool = False) -> np.ndarray:
     """
     if check:
         assert raw.shape[0] >= 5, f"entry too short: {raw.shape[0]}"
-        assert raw[0] == OLD_CLS and raw[1] == OLD_SEP, f"bad prefix {raw[:2]}"
-        assert raw[-1] == OLD_SEP and raw[-2] == OLD_SEP, f"bad suffix {raw[-2:]}"
+        assert raw[0] == STORED_CLS and raw[1] == STORED_SEP, f"bad prefix {raw[:2]}"
+        assert raw[-1] == STORED_SEP and raw[-2] == STORED_SEP, f"bad suffix {raw[-2:]}"
     ids = REMAP_LUT[raw[1:-1]]
     ids[0] = BOS_ID
     return ids

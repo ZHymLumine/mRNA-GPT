@@ -21,7 +21,7 @@ import os
 import sys
 from pathlib import Path
 
-__all__ = ["ROOT", "RUNS", "DATA", "EXTERNAL", "external", "legacy_root"]
+__all__ = ["ROOT", "RUNS", "DATA", "EXTERNAL", "external"]
 
 
 def _resolve(var: str, default: str, root: Path) -> Path:
@@ -52,16 +52,3 @@ def external(name: str, var: str | None = None) -> Path:
     return EXTERNAL / name
 
 
-def legacy_root() -> Path:
-    """Root of the predecessor mRNAdesigner codebase (MRNA_GPT_LEGACY_ROOT).
-
-    That codebase is not distributed with this repository and there is no
-    sensible default for it, so the few scripts that read assets from it
-    require the variable to be set.
-    """
-    value = os.environ.get("MRNA_GPT_LEGACY_ROOT")
-    if not value:
-        sys.exit("MRNA_GPT_LEGACY_ROOT is not set. Point it at a checkout of the "
-                 "legacy mRNAdesigner tree; that codebase is not part of this "
-                 "repository and has no default location.")
-    return Path(value).expanduser()

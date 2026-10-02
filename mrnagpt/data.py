@@ -116,7 +116,7 @@ def _open_env(path: str):
 
 
 class CodonLMDBDataset(Dataset):
-    """Reads legacy-encoded LMDB entries and remaps them to the 68-token vocab."""
+    """Reads stored LMDB entries and remaps them to the 68-token vocabulary."""
 
     def __init__(self, lmdb_path: str, lengths_path: str | None = None,
                  check: bool = False):

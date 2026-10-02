@@ -16,36 +16,6 @@ equals the target protein **by construction** rather than with high probability.
 
 ---
 
-## Loading earlier checkpoints
-
-An earlier version of this codebase used a 69-token vocabulary carrying
-`[CLS]`/`[SEP]`/`[MASK]`, learned positional embeddings and a 1024-codon
-context. Those checkpoints cannot be loaded with the current tokenizer.
-
-Both vocabularies order codons alphabetically — exactly
-`itertools.product("ACGU", repeat=3)` — so each codon keeps its relative
-position and shifts by the one removed special token:
-`codon_id_current = codon_id_old - 1`. The data-side conversion is a lookup
-table in [`mrnagpt/vocab.py`](mrnagpt/vocab.py):
-
-```python
-from mrnagpt.vocab import remap_entry
-ids_new = remap_entry(raw_legacy_entry)
-```
-
-The remap converts stored **data, not weights**: an older checkpoint indexes its
-embedding table by the old ids and has to be fed old ids.
-[`tools/eval_legacy_ckpt.py`](tools/eval_legacy_ckpt.py) loads one under the
-current code, reading its original `model_args` without remapping.
-
-If you build data for an older checkpoint with `BertTokenizerFast`, pin
-`transformers==4.46.3` and `tokenizers==0.20.3`: under 5.x the same vocabulary
-file is read as 5 tokens and every codon silently becomes `[UNK]`, with no error
-raised. The current codebase never constructs a tokenizer object, so it is not
-exposed to this.
-
----
-
 ## Install
 
 ```bash

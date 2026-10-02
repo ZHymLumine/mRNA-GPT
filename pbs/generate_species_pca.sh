@@ -9,10 +9,9 @@
 #PBS -e logs/gen_species_pca.err
 # Figure 2d and Supplementary Figure S1f,g.
 #
-# Built the way the earlier version of the paper built its Figure 2A-D: cluster
-# the models' own final-hidden-state embeddings, 500 coding sequences per
-# species, coloured by species, PCA then UMAP.  The difference is what is
-# embedded -- there, real coding sequences; here, sequences the pretrained
+# Cluster the models' own final-hidden-state embeddings, 500 coding sequences
+# per species, coloured by species, PCA then UMAP.  Note what is embedded here:
+# not real coding sequences, but sequences the pretrained
 # model wrote itself, conditioned on a 60-codon prefix from each species and
 # with that prefix discarded.
 : "${MRNA_GPT_ROOT:=${PBS_O_WORKDIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}}"
@@ -22,7 +21,7 @@ set -euo pipefail
 source /etc/profile.d/modules.sh
 module load cuda/12.6/12.6.1
 source ~/.bashrc
-conda activate mRNAdesigner3
+conda activate "${MRNA_GPT_ENV:-mrnagpt}"
 cd "${MRNA_GPT_ROOT}"
 W=${MRNA_GPT_RUNS}/species_pca
 for dom in archaea bacteria eukaryote; do

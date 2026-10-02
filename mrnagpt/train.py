@@ -279,11 +279,8 @@ def main(argv=None):
         if ddp.is_master:
             # NOTE on the incl-PAD figure: this model never trains on PAD
             # (ignore_index), so it scores PAD positions terribly and the
-            # combined number comes out *higher*, not lower.  The published runs
-            # trained on PAD and predicted it almost perfectly, which is what
-            # diluted their loss down to ~0.70.  The two are therefore not
-            # comparable, and the PAD-dilution correction has to be measured on
-            # the published checkpoints themselves (tools/eval_legacy_ckpt.py).
+            # combined number comes out *higher*, not lower.  It is a
+            # diagnostic, not a perplexity to report.
             print(f"[{tag}] step {global_step} val_loss {res['loss']:.4f} "
                   f"ppl {res['ppl']:.3f} | PAD-position loss "
                   f"{res.get('loss_pad_positions', float('nan')):.3f} "

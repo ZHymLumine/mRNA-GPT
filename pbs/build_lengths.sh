@@ -15,7 +15,7 @@
 set -euo pipefail
 source /etc/profile.d/modules.sh
 source ~/.bashrc
-conda activate mRNAdesigner3
+conda activate "${MRNA_GPT_ENV:-mrnagpt}"
 cd "${MRNA_GPT_ROOT}"
 D=${MRNA_GPT_DATA}
 for dom in archaea bacteria eukaryote; do

@@ -10,13 +10,13 @@ Differences from the original save_lmdb.py:
   3. Builds the codon -> id mapping straight from vocab.txt instead of calling
      tokenizer.encode line by line, which is 1-2 orders of magnitude faster; a
      sample is asserted token-by-token against BertTokenizerFast before writing.
-  4. dtype defaults to uint8 (the vocabulary has only 69 tokens).  int32 would
+  4. dtype defaults to uint8 (the stored table has only 69 ids).  int32 would
      make the LMDB 4x larger.  This requires train.py to read a configurable
      dtype instead of np.frombuffer(value, dtype=np.int32).
 
-The encoding is identical to the original pipeline: [CLS] [SEP] <codons> [SEP] [SEP]
-(the original code passed tokenizer.encode("[SEP]" + text + "[SEP]") and the
-tokenizer then added [CLS]/[SEP] itself).
+Entries are framed [CLS] [SEP] <codons> [SEP] [SEP], which is what
+mrnagpt.data.CodonLMDBDataset reads and mrnagpt.vocab.remap_entry converts to
+the 68-token model vocabulary at load time.
 """
 import argparse
 import os

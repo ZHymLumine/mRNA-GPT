@@ -1,13 +1,12 @@
 """Decoder-only codon language model.
 
-Architecture follows the published mRNA-GPT (24 layers, d_model 1024, 16 heads,
-pre-LN, no bias, GELU, tied embeddings) so results stay comparable.  Three things
-differ:
+A GPT-3 Medium-shaped decoder: 24 layers, d_model 1024, 16 heads, pre-LN, no
+bias, GELU, tied embeddings, over a 68-token codon vocabulary and a 2048-codon
+context.
 
-* ``vocab_size`` is 68, not 69 -- ``[CLS]`` and ``[MASK]`` are gone.
-* ``block_size`` defaults to 2048, not 1024.
-* the positional encoding is pluggable: ``learned`` reproduces the published
-  ``wpe`` table, ``rope`` removes the hard architectural ceiling on context.
+The positional encoding is pluggable.  ``rope`` is the default and removes the
+hard architectural ceiling on context length; ``learned`` keeps a ``wpe`` table
+and is retained so the two can be compared directly in an ablation.
 
 The loss is returned as a **sum** over non-PAD tokens, never a mean.  The caller
 owns the denominator, which is what lets gradient accumulation compute an exact

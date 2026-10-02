@@ -7,7 +7,7 @@ in nats we need two models that differ *only* in the split rule -- same sequence
 same code, same hyperparameters -- so this writes a split file in exactly the
 format ``scripts/04_write_codon_txt.py`` consumes.
 
-Note this cannot be done by re-scoring the published checkpoints: those trained on
+Note this cannot be done by re-scoring an existing checkpoint: one trained on
 a random 90% of essentially this corpus, so they have already seen most of the
 homology-clean validation set too.
 """

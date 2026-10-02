@@ -1,6 +1,6 @@
 """Atomic checkpoint save/load/prune.
 
-All three published runs died writing a checkpoint (``PytorchStreamWriter failed
+Long runs have died writing a checkpoint (``PytorchStreamWriter failed
 writing file data/367: file write failed``), and ``result_archea/ckpt_69000.pt``
 was left truncated at 3,028,570,240 B against 3,638,109,387 B for its siblings --
 unloadable, losing everything after step 62,000.  Hence: write to a temp file,

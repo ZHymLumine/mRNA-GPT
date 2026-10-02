@@ -3,24 +3,9 @@
 
 Training checkpoints carry the AdamW moments and the RNG state, which makes them
 roughly 3.6 GB for a 303M-parameter model.  Nothing downstream of training needs
-either, so what gets published is weights only, in bf16 safetensors (~600 MB).
-
-Two checkpoint layouts are understood:
-
-``preprint``  the earlier codebase: 69-token vocabulary, learned positional
-              embeddings, ``block_size`` 1024, and an ``iter_num`` counter.  A
-              stale top-level ``wte.weight`` alias of ``transformer.wte.weight``
-              is dropped.
-``current``   this codebase: 68-token vocabulary, RoPE, ``block_size`` 2048,
-              ``global_step``/``epoch`` counters and a ``git_sha``.
-
-The two are *not* interchangeable -- a preprint checkpoint indexes its embedding
-table by the old token ids -- so the vocabulary and positional encoding are
-written into ``config.json`` and the lineage is recorded in ``provenance.json``.
-
-Usage:
-    python export_for_hf.py --ckpt runs/bacteria/model_best.pt \\
-                            --out export/mRNA-GPT-bacteria
+either, so what gets published is weights only, in bf16 safetensors (~600 MB),
+beside a ``config.json``, the codon vocabulary and a ``provenance.json``
+recording the source checkpoint, its step and the SHA-256 of the weights.
 """
 from __future__ import annotations
 
@@ -33,8 +18,7 @@ import os
 import torch
 
 CODONS = ["".join(c) for c in itertools.product("ACGU", repeat=3)]
-PREPRINT_SPECIALS = ["[PAD]", "[UNK]", "[CLS]", "[SEP]", "[MASK]"]
-CURRENT_SPECIALS = ["[PAD]", "[UNK]", "[BOS]", "[EOS]"]
+SPECIALS = ["[PAD]", "[UNK]", "[BOS]", "[EOS]"]
 
 
 def _sha256(path: str, chunk: int = 1 << 20) -> str:
@@ -46,10 +30,6 @@ def _sha256(path: str, chunk: int = 1 << 20) -> str:
                 break
             h.update(b)
     return h.hexdigest()
-
-
-def _detect_lineage(state: dict) -> str:
-    return "preprint" if "iter_num" in state and "global_step" not in state else "current"
 
 
 def _clean_state_dict(raw: dict) -> dict:
@@ -64,8 +44,6 @@ def _clean_state_dict(raw: dict) -> dict:
         if not torch.is_tensor(v):
             continue
         k = k[10:] if k.startswith("_orig_mod.") else k
-        if k == "wte.weight":            # preprint-era top-level alias
-            continue
         key = (v.data_ptr(), tuple(v.shape))
         if key in seen:                  # tied weight: keep the first name only
             print(f"  tied: {k!r} -> {seen[key]!r} (not serialised)")
@@ -75,11 +53,9 @@ def _clean_state_dict(raw: dict) -> dict:
     return out
 
 
-def export(ckpt_path: str, out_dir: str, *, dtype: str = "bf16",
-           lineage: str | None = None) -> dict:
+def export(ckpt_path: str, out_dir: str, *, dtype: str = "bf16") -> dict:
     print(f"loading {ckpt_path}")
     st = torch.load(ckpt_path, map_location="cpu", weights_only=False)
-    lineage = lineage or _detect_lineage(st)
     margs = dict(st["model_args"])
 
     sd = _clean_state_dict(st["model"])
@@ -103,8 +79,7 @@ def export(ckpt_path: str, out_dir: str, *, dtype: str = "bf16",
     cfg = {
         "model_type": "mrna-gpt",
         "architectures": ["GPT"],
-        "lineage": lineage,
-        "n_layer": margs["n_layer"],
+                "n_layer": margs["n_layer"],
         "n_head": margs["n_head"],
         "n_embd": margs["n_embd"],
         "block_size": margs["block_size"],
@@ -126,29 +101,21 @@ def export(ckpt_path: str, out_dir: str, *, dtype: str = "bf16",
 
     prov = {
         "source_checkpoint": os.path.basename(ckpt_path),
-        "lineage": lineage,
         "export_dtype": dtype,
         "n_parameters": n_params,
         "sha256": _sha256(weights_path),
         "size_bytes": os.path.getsize(weights_path),
     }
-    for k in ("iter_num", "global_step", "epoch", "tokens_seen", "git_sha"):
+    for k in ("global_step", "epoch", "tokens_seen", "git_sha"):
         if k in st:
             prov[k] = st[k]
     best = st.get("best_val_loss")
     if best is not None:
-        prov["best_val_loss_as_recorded"] = float(best)
-        if lineage == "preprint":
-            prov["best_val_loss_note"] = (
-                "Recorded under the preprint-era convention, which averages loss "
-                "over padding positions and so understates per-token loss. Not "
-                "comparable to numbers reported with padding masked out."
-            )
+        prov["best_val_loss"] = float(best)
     with open(os.path.join(out_dir, "provenance.json"), "w") as fh:
         json.dump(prov, fh, indent=2, default=str)
 
-    specials = CURRENT_SPECIALS if lineage == "current" else PREPRINT_SPECIALS
-    vocab = specials + CODONS
+    vocab = SPECIALS + CODONS
     if len(vocab) != cfg["vocab_size"]:
         raise RuntimeError(f"vocab size mismatch: built {len(vocab)}, "
                            f"checkpoint says {cfg['vocab_size']}")
@@ -156,7 +123,7 @@ def export(ckpt_path: str, out_dir: str, *, dtype: str = "bf16",
         fh.write("\n".join(vocab) + "\n")
 
     print(f"  wrote {out_dir}  ({prov['size_bytes'] / 1e6:.0f} MB, "
-          f"{n_params / 1e6:.1f}M params, {lineage})")
+          f"{n_params / 1e6:.1f}M params)")
     return prov
 
 
@@ -166,10 +133,8 @@ def main() -> None:
     ap.add_argument("--ckpt", required=True)
     ap.add_argument("--out", required=True)
     ap.add_argument("--dtype", default="bf16", choices=("bf16", "fp16", "fp32"))
-    ap.add_argument("--lineage", default=None, choices=("preprint", "current"),
-                    help="override autodetection")
     args = ap.parse_args()
-    export(args.ckpt, args.out, dtype=args.dtype, lineage=args.lineage)
+    export(args.ckpt, args.out, dtype=args.dtype)
 
 
 if __name__ == "__main__":

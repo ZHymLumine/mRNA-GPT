@@ -15,7 +15,7 @@
 # their homologs.  Previously stability and fungal used this pool but two
 # different scripts, and bacteria used the standard protocol on the TRAIN split.
 #
-# Control: stability reuses the exact folds of the published run
+# Control: stability reuses the exact folds of the reference run
 # (train 5001 / select 1705 / held out 1590), so its held-out Pearson should
 # come back at about 0.391.  If it does not, something other than the protocol
 # changed and the other two numbers are not trustworthy either.

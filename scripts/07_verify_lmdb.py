@@ -50,7 +50,7 @@ def main():
             line = p.stdout.readline().decode().strip()
             expect = line.split()
             got = [toks[j] for j in ids]
-            # encoding: [CLS] [SEP] <codons> [SEP] [SEP]
+            # stored framing: [CLS] [SEP] <codons> [SEP] [SEP]
             assert got[:2] == ["[CLS]", "[SEP]"], got[:2]
             assert got[-2:] == ["[SEP]", "[SEP]"], got[-2:]
             assert got[2:-2] == expect, f"codons of record {i} do not match"

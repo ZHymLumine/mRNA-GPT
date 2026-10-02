@@ -7,7 +7,7 @@ pbs/fig5_score_all_tasks.sh (right column); this only transcribes them into the
 cache the figure reads, so nothing here can introduce a value that the pipeline
 did not compute.
 
-It replaces an earlier version that spliced externally computed values into a
+It replaces an approach that spliced externally computed values into a
 cache assembled from several different reference sets -- the arrangement that
 let Figure 5's rows disagree about which genes were "real high-property" ones.
 

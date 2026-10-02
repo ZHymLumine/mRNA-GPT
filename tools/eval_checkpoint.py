@@ -18,7 +18,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from mrnagpt.data import CodonLMDBDataset                    # noqa: E402
 from mrnagpt.distributed import DDPInfo                      # noqa: E402
-from mrnagpt.evaluate import evaluate, evaluate_legacy       # noqa: E402
+from mrnagpt.evaluate import evaluate                        # noqa: E402
 from mrnagpt.model import GPT, GPTConfig                     # noqa: E402
 
 
@@ -31,8 +31,6 @@ def main():
     ap.add_argument("--label", action="append", default=None)
     ap.add_argument("--token-budget", type=int, default=32768)
     ap.add_argument("--max-seqs", type=int, default=0, help="0 = full pass")
-    ap.add_argument("--legacy-too", action="store_true",
-                    help="also report the published pad-to-block_size convention")
     ap.add_argument("--report", default=None)
     args = ap.parse_args()
 
@@ -51,9 +49,6 @@ def main():
         ds = CodonLMDBDataset(path)
         res = evaluate(model, ds, ddp=ddp, device=device,
                        token_budget=args.token_budget, max_seqs=args.max_seqs)
-        if args.legacy_too:
-            res.update(evaluate_legacy(model, ds, ddp=ddp, device=device,
-                                       block_size=cfg.block_size))
         res["label"] = label
         res["lmdb"] = path
         rows.append(res)

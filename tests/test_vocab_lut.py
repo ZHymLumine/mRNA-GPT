@@ -3,8 +3,7 @@ import unittest
 
 import numpy as np
 
-from tests.common import (HAVE_DATA, HAVE_LEGACY_VOCAB, LEGACY_VOCAB, VAL_LMDB,
-                          VAL_TXT)
+from tests.common import HAVE_DATA, VAL_LMDB, VAL_TXT
 from mrnagpt import vocab as v
 
 
@@ -16,23 +15,24 @@ class TestVocab(unittest.TestCase):
         self.assertEqual(len(v.CODONS), 64)
         self.assertEqual(len(set(v.CODONS)), 64)
 
-    @unittest.skipUnless(HAVE_LEGACY_VOCAB, "legacy mRNAdesigner vocab not available")
-    def test_codon_order_matches_legacy_vocab(self):
-        """Old id k must map to new id k-1; anything else silently corrupts data."""
-        old = [l.strip() for l in open(LEGACY_VOCAB) if l.strip()]
-        self.assertEqual(len(old), 69)
-        self.assertEqual(old[:5], ["[PAD]", "[UNK]", "[CLS]", "[SEP]", "[MASK]"])
-        self.assertEqual(tuple(old[5:]), v.CODONS)
+    def test_codon_order_matches_stored_encoding(self):
+        """Stored id k must map to model id k-1; anything else corrupts data."""
+        self.assertEqual(v.STORED_VOCAB_SIZE, v.VOCAB_SIZE + 1)
+        lut = v.build_remap_lut()
+        for k, codon in enumerate(v.CODONS):
+            stored_id = v.STORED_CODON0 + k
+            self.assertEqual(int(lut[stored_id]), v.TOK2ID[codon])
+            self.assertEqual(int(lut[stored_id]), stored_id - 1)
 
     def test_lut(self):
         lut = v.build_remap_lut()
         self.assertEqual(lut.dtype, np.uint8)
         self.assertEqual(lut.shape, (256,))
-        self.assertEqual(int(lut[v.OLD_SEP]), v.EOS_ID)
-        self.assertEqual(int(lut[v.OLD_UNK]), v.UNK_ID)
+        self.assertEqual(int(lut[v.STORED_SEP]), v.EOS_ID)
+        self.assertEqual(int(lut[v.STORED_UNK]), v.UNK_ID)
         for old_id in range(5, 69):
             self.assertEqual(int(lut[old_id]), old_id - 1)
-        for bad in (v.OLD_PAD, v.OLD_CLS, v.OLD_MASK, 200, 255):
+        for bad in (v.STORED_PAD, v.STORED_CLS, v.STORED_MASK, 200, 255):
             self.assertEqual(int(lut[bad]), v.UNK_ID)
 
     def test_genetic_code(self):
@@ -72,10 +72,10 @@ class TestVocab(unittest.TestCase):
         with env.begin(buffers=True) as txn:
             for i in range(n):
                 raw = np.frombuffer(txn.get(b"%d" % i), dtype=np.uint8)
-                self.assertEqual(int(raw[0]), v.OLD_CLS)
-                self.assertEqual(int(raw[1]), v.OLD_SEP)
-                self.assertEqual(int(raw[-1]), v.OLD_SEP)
-                self.assertEqual(int(raw[-2]), v.OLD_SEP)
+                self.assertEqual(int(raw[0]), v.STORED_CLS)
+                self.assertEqual(int(raw[1]), v.STORED_SEP)
+                self.assertEqual(int(raw[-1]), v.STORED_SEP)
+                self.assertEqual(int(raw[-2]), v.STORED_SEP)
                 ids = v.remap_entry(raw, check=True)
                 self.assertEqual(int(ids[0]), v.BOS_ID)
                 self.assertEqual(int(ids[-1]), v.EOS_ID)

@@ -18,7 +18,7 @@
 set -euo pipefail
 source /etc/profile.d/modules.sh
 source ~/.bashrc
-conda activate mRNAdesigner3
+conda activate "${MRNA_GPT_ENV:-mrnagpt}"
 cd "${MRNA_GPT_ROOT}"
 OUT=${MRNA_GPT_RUNS}/fungal_sft/generation_panel/baselines
 TABLE=$OUT/codon_usage_fungal_p75.csv

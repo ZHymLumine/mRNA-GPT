@@ -18,13 +18,14 @@
 : "${MRNA_GPT_DATA:=$MRNA_GPT_ROOT/data}"
 : "${MRNA_GPT_EXTERNAL:=$MRNA_GPT_ROOT/external}"
 : "${MRNA_GPT_SCRATCH:=${PBS_LOCALDIR:-${TMPDIR:-/tmp}}/mrnagpt}"
+: "${MRNA_GPT_ENV:=mrnagpt}"   # conda env built by scripts/00_setup_env.sh
 
 set -euo pipefail
 
 source /etc/profile.d/modules.sh
 module load cuda/12.6/12.6.1
 source ~/.bashrc
-conda activate mRNAdesigner3
+conda activate "${MRNA_GPT_ENV:-mrnagpt}"
 
 REPO="$MRNA_GPT_ROOT"
 SCRATCH="$MRNA_GPT_SCRATCH"
@@ -53,8 +54,8 @@ export PYTHONNOUSERSITE=1
 PY="$(command -v python)"
 TORCHRUN="$PY -m torch.distributed.run"
 case "$PY" in
-    */envs/mRNAdesigner3/bin/python) ;;
-    *) echo "FATAL: python is $PY, expected the mRNAdesigner3 env" >&2; exit 1 ;;
+    */envs/${MRNA_GPT_ENV:-mrnagpt}/bin/python) ;;
+    *) echo "FATAL: python is $PY, expected the ${MRNA_GPT_ENV:-mrnagpt} env" >&2; exit 1 ;;
 esac
 "$PY" - <<'PYCHK'
 import sys, torch
