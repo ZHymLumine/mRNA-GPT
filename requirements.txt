@@ -1,0 +1,11 @@
+# Exact versions used for the reported runs.
+# The training package deliberately does NOT import transformers: no tokenizer
+# object is ever constructed, which also removes the transformers 4.46 vs 5.x
+# hazard where the codon vocab silently decodes to all [UNK].
+python==3.10.16
+torch==2.5.1          # +cu124
+numpy==1.26.4
+lmdb==1.5.1
+PyYAML==6.0.2
+matplotlib==3.10.0
+pandas==2.2.3

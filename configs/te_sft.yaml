@@ -1,0 +1,55 @@
+# Fine-tune mRNA-GPT-bacteria on the high-translation-efficiency subset of the
+# E. coli TE dataset (TE > 2, an absolute cut specified for this property rather
+# than the top quartile used for the other two: it keeps 487 of 2,688 training
+# sequences, 18.1%, slightly stricter than a quartile).
+#
+# Unlike the stability arm this is an IN-DOMAIN fine-tune: E. coli is inside the
+# bacterial pretraining corpus.
+#
+# 439 SFT-train / 48 SFT-val sequences, 15 steps/epoch on 1 GPU -- the smallest
+# of the three property datasets, so dropout matters most here.
+domain: te_sft
+data_dir: sft/data
+out_dir: runs/te_sft
+train_lmdb: sft_high_translation_efficiency_train.lmdb
+val_lmdb: sft_high_translation_efficiency_val.lmdb
+val_full_lmdb: sft_high_translation_efficiency_val.lmdb
+init_ckpt: runs/bacteria/model_best.pt
+
+num_workers: 4
+token_budget: 32768
+grad_accum: 1
+seed: 42
+
+schedule: cosine
+lr: 3.0e-5          # 10x below bacteria's pretraining peak (3.0e-4)
+min_lr: 3.0e-6
+warmup_steps: 10
+weight_decay: 0.1
+beta1: 0.9
+beta2: 0.95
+grad_clip: 1.0
+
+max_epochs: 60       # 15 steps/epoch -> 900 steps total budget
+min_epochs: 5
+early_stop_patience: 8
+early_stop_min_delta: 0.002
+early_stop_burn_in_frac: 0.10
+eval_interval: 15    # once per epoch; identical value in the low-TE control
+eval_seqs: 48        # the whole SFT-val set
+log_interval: 5
+
+grad_norm_skip_factor: 0.0
+max_hours: 1.5
+keep_last: 3
+compile: true
+dtype: bfloat16
+
+model:
+  pos_encoding: rope
+  block_size: 2048
+  n_layer: 24
+  n_head: 16
+  n_embd: 1024
+  bias: false
+  dropout: 0.1

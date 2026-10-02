@@ -1,0 +1,54 @@
+# NEGATIVE CONTROL for configs/bacexp_sft.yaml. Same hyperparameters, fine-tuned
+# on the 1,641 lowest-expression sequences (E <= 2) instead of the 2,200 with
+# E >= 4. Not size-matched -- see the note in bacexp_sft.yaml for why a
+# size-matched control would have contained E=3 sequences.
+#
+# Covariate: the high arm averages 806 nt against this arm's 861 nt (7% apart),
+# and GC 50.1% against 53.0%. Codon metrics are computed within synonymous
+# families so length cannot enter them; GC-sensitive metrics should be read with
+# the GC gap in mind.
+domain: bacexp_sft_low
+data_dir: sft/data
+out_dir: runs/bacexp_sft_low
+train_lmdb: sft_low_bacteria_expression_train.lmdb
+val_lmdb: sft_low_bacteria_expression_val.lmdb
+val_full_lmdb: sft_low_bacteria_expression_val.lmdb
+init_ckpt: runs/bacteria/model_best.pt
+
+num_workers: 4
+token_budget: 32768
+grad_accum: 1
+seed: 42
+
+schedule: cosine
+lr: 3.0e-5          # 10x below bacteria's pretraining peak (3.0e-4)
+min_lr: 3.0e-6
+warmup_steps: 10
+weight_decay: 0.1
+beta1: 0.9
+beta2: 0.95
+grad_clip: 1.0
+
+max_epochs: 60
+min_epochs: 5
+early_stop_patience: 8
+early_stop_min_delta: 0.002
+early_stop_burn_in_frac: 0.10
+eval_interval: 22   # one pass over this arm's training set
+eval_seqs: 165
+log_interval: 5
+
+grad_norm_skip_factor: 0.0
+max_hours: 1.5
+keep_last: 3
+compile: true
+dtype: bfloat16
+
+model:
+  pos_encoding: rope
+  block_size: 2048
+  n_layer: 24
+  n_head: 16
+  n_embd: 1024
+  bias: false
+  dropout: 0.1

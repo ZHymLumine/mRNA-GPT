@@ -1,0 +1,22 @@
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+
+# local corpora, checkpoints and run outputs (repository root only --
+# evaluate/data/ and tests/data/ are small tracked fixtures)
+/data/
+/runs/
+/external/
+/legacy/
+/logs/
+/raw_data/
+*.lmdb
+*.lmdb.lengths.npy
+*.lmdb.lengths.npy.meta
+*.pt
+*.safetensors
+
+# manuscript and correspondence must never be committed here
+*.docx
+*.pdf

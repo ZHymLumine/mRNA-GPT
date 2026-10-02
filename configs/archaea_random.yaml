@@ -1,0 +1,37 @@
+num_workers: 8
+token_budget: 32768
+seed: 42
+schedule: cosine
+weight_decay: 0.1
+beta1: 0.9
+beta2: 0.95
+grad_clip: 1.0
+log_interval: 10
+early_stop_min_delta: 0.002
+early_stop_burn_in_frac: 0.25
+grad_norm_skip_factor: 0.0
+max_hours: 3.2
+keep_last: 3
+compile: true
+dtype: bfloat16
+model:
+  pos_encoding: rope
+  block_size: 2048
+  n_layer: 24
+  n_head: 16
+  n_embd: 1024
+  bias: false
+  dropout: 0.1
+domain: archaea
+data_dir: data/archaea_random
+out_dir: runs/archaea_random
+max_epochs: 10
+lr: 0.00025
+min_lr: 2.5e-05
+warmup_steps: 750
+grad_accum: 1
+eval_interval: 250
+early_stop_patience: 12
+min_epochs: 2
+eval_seqs: 50000
+max_consecutive_skips: 10

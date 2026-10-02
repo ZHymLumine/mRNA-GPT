@@ -1,0 +1,24 @@
+domain: archaea
+data_dir: data/archaea
+out_dir: runs/tiny
+token_budget: 2048
+grad_accum: 2
+max_epochs: 1
+lr: 0.001
+min_lr: 0.0001
+warmup_steps: 5
+eval_interval: 20
+eval_seqs: 256
+num_workers: 0
+log_interval: 5
+compile: false
+max_steps: 20
+model:
+  pos_encoding: rope
+  block_size: 2048
+  n_layer: 2
+  n_head: 4
+  n_embd: 64
+  bias: false
+  dropout: 0.0
+train_probe_seqs: 256

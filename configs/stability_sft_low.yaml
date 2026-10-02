@@ -1,0 +1,61 @@
+# NEGATIVE CONTROL. Identical to configs/stability_sft.yaml in every
+# hyperparameter, data size (4,873 train / 541 val) and procedure -- the only
+# difference is that the fine-tuning set is the BOTTOM quartile of measured mRNA
+# stability instead of the top. If generated sequences move toward the
+# low-stability codon profile, the direction of the shift is set by the measured
+# property, not by the act of fine-tuning on any small subset of this dataset;
+# it also separates "learned to look like this host" from
+# "learned to look stable", which is what the JS-to-high-stability-profile
+# metric claims to measure.
+#
+# Note the covariate the control also exposes: the bottom quartile is LONGER
+# (mean 1,359 nt) than the top (1,219 nt), and length is itself a determinant of
+# measured half-life. Codon-usage metrics are computed within synonymous
+# families, so length cannot enter them directly, but any length-sensitive
+# metric (MFE total, LightGBM, which takes length as a feature) must be read
+# with that in mind.
+domain: stability_sft_low
+data_dir: sft/data
+out_dir: runs/stability_sft_low
+train_lmdb: sft_low_stability_train.lmdb
+val_lmdb: sft_low_stability_val.lmdb
+val_full_lmdb: sft_low_stability_val.lmdb
+init_ckpt: runs/archaea/model_best.pt
+
+num_workers: 4
+token_budget: 32768
+grad_accum: 1
+seed: 42
+
+schedule: cosine
+lr: 2.5e-5          # 10x below archaea's pretraining peak (2.5e-4)
+min_lr: 2.5e-6
+warmup_steps: 20
+weight_decay: 0.1
+beta1: 0.9
+beta2: 0.95
+grad_clip: 1.0
+
+max_epochs: 30       # 84 steps/epoch here (longer sequences), same step budget
+min_epochs: 3
+early_stop_patience: 8
+early_stop_min_delta: 0.002
+early_stop_burn_in_frac: 0.10
+eval_interval: 75    # identical to the high-stability arm, deliberately
+eval_seqs: 541       # the whole SFT-val set
+log_interval: 10
+
+grad_norm_skip_factor: 0.0
+max_hours: 2.5
+keep_last: 3
+compile: true
+dtype: bfloat16
+
+model:
+  pos_encoding: rope
+  block_size: 2048
+  n_layer: 24
+  n_head: 16
+  n_embd: 1024
+  bias: false
+  dropout: 0.1        # small dataset: dropout guards against memorization

@@ -1,0 +1,54 @@
+# Fine-tune mRNA-GPT-archaea on the top-quartile (real measured mRNA stability)
+# subset of mRNA_Stability.csv. Continues from the pretrained checkpoint via
+# init_ckpt (weights only; optimizer/epoch/step counters start fresh) -- see
+# mrnagpt/train.py's init_ckpt path, sft/prepare_property_split.py for the
+# homology-clean re-split (reports/mrna_stability_leakage.md) and
+# sft/prepare_sft_data.py for how the filtered train/val LMDBs were built.
+#
+# 4,873 SFT-train / 541 SFT-val sequences, 74 steps/epoch at token_budget 32768
+# on 1 GPU. Larger than the fungal SFT set (1,149) but the same shape of job.
+domain: stability_sft
+data_dir: sft/data
+out_dir: runs/stability_sft
+train_lmdb: sft_high_stability_train.lmdb
+val_lmdb: sft_high_stability_val.lmdb
+val_full_lmdb: sft_high_stability_val.lmdb
+init_ckpt: runs/archaea/model_best.pt
+
+num_workers: 4
+token_budget: 32768
+grad_accum: 1
+seed: 42
+
+schedule: cosine
+lr: 2.5e-5          # 10x below archaea's pretraining peak (2.5e-4)
+min_lr: 2.5e-6
+warmup_steps: 20
+weight_decay: 0.1
+beta1: 0.9
+beta2: 0.95
+grad_clip: 1.0
+
+max_epochs: 30       # 74 steps/epoch on 1 GPU -> ~2,220 steps total budget
+min_epochs: 3
+early_stop_patience: 8
+early_stop_min_delta: 0.002
+early_stop_burn_in_frac: 0.10
+eval_interval: 75    # ~once per epoch; same value in the low-stability control
+eval_seqs: 541       # the whole SFT-val set
+log_interval: 10
+
+grad_norm_skip_factor: 0.0
+max_hours: 2.5
+keep_last: 3
+compile: true
+dtype: bfloat16
+
+model:
+  pos_encoding: rope
+  block_size: 2048
+  n_layer: 24
+  n_head: 16
+  n_embd: 1024
+  bias: false
+  dropout: 0.1        # small dataset: dropout guards against memorization

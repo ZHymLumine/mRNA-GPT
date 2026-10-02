@@ -1,0 +1,58 @@
+# Fine-tune mRNA-GPT-bacteria on the high-expression subset of the bacterial
+# protein-expression library: E >= 4 on the dataset's 0-5 scale (2,200 of 4,461
+# training sequences, 49.3%).
+#
+# NEGATIVE-CONTROL NOTE. The dataset is top-heavy (train E counts
+# 0:1240 1:91 2:310 3:620 4:810 5:1390), so a control size-matched to this high
+# arm would have had to take the bottom 2,200 -- which reaches up into 559 E=3
+# sequences. Rather than put mid-expression data in the low arm, the control uses
+# a clean cut at E <= 2 (1,641 sequences). The two arms therefore differ in size
+# (1,980 vs 1,476 after the SFT sub-split), which is recorded rather than hidden;
+# each is evaluated once per its own epoch so "one epoch" means one pass for both.
+#
+# In-domain: the library is bacterial and the backbone was pretrained on bacteria.
+domain: bacexp_sft
+data_dir: sft/data
+out_dir: runs/bacexp_sft
+train_lmdb: sft_high_bacteria_expression_train.lmdb
+val_lmdb: sft_high_bacteria_expression_val.lmdb
+val_full_lmdb: sft_high_bacteria_expression_val.lmdb
+init_ckpt: runs/bacteria/model_best.pt
+
+num_workers: 4
+token_budget: 32768
+grad_accum: 1
+seed: 42
+
+schedule: cosine
+lr: 3.0e-5          # 10x below bacteria's pretraining peak (3.0e-4)
+min_lr: 3.0e-6
+warmup_steps: 10
+weight_decay: 0.1
+beta1: 0.9
+beta2: 0.95
+grad_clip: 1.0
+
+max_epochs: 60
+min_epochs: 5
+early_stop_patience: 8
+early_stop_min_delta: 0.002
+early_stop_burn_in_frac: 0.10
+eval_interval: 27   # one pass over this arm's training set
+eval_seqs: 220
+log_interval: 5
+
+grad_norm_skip_factor: 0.0
+max_hours: 1.5
+keep_last: 3
+compile: true
+dtype: bfloat16
+
+model:
+  pos_encoding: rope
+  block_size: 2048
+  n_layer: 24
+  n_head: 16
+  n_embd: 1024
+  bias: false
+  dropout: 0.1

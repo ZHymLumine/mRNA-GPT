@@ -1,0 +1,50 @@
+# Fine-tune mRNA-GPT-eukaryote on the top-quartile (real measured expression)
+# subset of Fungal_expression.csv. Continues from the pretrained checkpoint via
+# init_ckpt (weights only; optimizer/epoch/step counters start fresh) -- see
+# mrnagpt/train.py's init_ckpt path and sft/prepare_sft_data.py for how the
+# filtered, homology-clean train/val LMDBs were built.
+domain: fungal_sft
+data_dir: sft/data
+out_dir: runs/fungal_sft
+train_lmdb: sft_high_expression_train.lmdb
+val_lmdb: sft_high_expression_val.lmdb
+val_full_lmdb: sft_high_expression_val.lmdb
+init_ckpt: runs/eukaryote/model_best.pt
+
+num_workers: 4
+token_budget: 32768
+grad_accum: 1
+seed: 42
+
+schedule: cosine
+lr: 3.0e-5          # ~10x below pretraining peak: standard fine-tuning scale
+min_lr: 3.0e-6
+warmup_steps: 10
+weight_decay: 0.1
+beta1: 0.9
+beta2: 0.95
+grad_clip: 1.0
+
+max_epochs: 60       # 20 steps/epoch on 1 GPU -> 1,200 steps total budget
+min_epochs: 5
+early_stop_patience: 8
+early_stop_min_delta: 0.002
+early_stop_burn_in_frac: 0.10
+eval_interval: 20    # ~once per epoch
+eval_seqs: 127        # the whole SFT-val set (127 seqs)
+log_interval: 5
+
+grad_norm_skip_factor: 0.0
+max_hours: 1.5
+keep_last: 3
+compile: true
+dtype: bfloat16
+
+model:
+  pos_encoding: rope
+  block_size: 2048
+  n_layer: 24
+  n_head: 16
+  n_embd: 1024
+  bias: false
+  dropout: 0.1        # tiny dataset (1,149 seqs): dropout guards against memorization
